@@ -25,7 +25,7 @@
     self.nameArr = @[@"DEV", @"PRO"];
     
     CGFloat btnX = 100;
-    CGFloat btnY = 100;
+    CGFloat btnY = 70;
     CGFloat btnW = self.view.frame.size.width - btnX * 2;
     CGFloat btnH = btnW * 0.618;
     CGRect btnF = CGRectMake(btnX, btnY, btnW, btnH);
@@ -37,19 +37,32 @@
    forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:btn1];
     
-    btnY = btnY + btnH + 100;
+    btnY = btnY + btnH + 70;
+    btnH = btnH * 0.5;
     btnF = CGRectMake(btnX, btnY, btnW, btnH);
     UIButton *btn2 = [[UIButton alloc] initWithFrame:btnF];
-    [btn2 setTitle:@"处理图标" forState:UIControlStateNormal];
+    [btn2 setTitle:@"处理Assets中的图标" forState:UIControlStateNormal];
     btn2.backgroundColor = [UIColor blueColor];
     [btn2 addTarget:self
              action:@selector(dealIcon:)
    forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:btn2];
+    btn2.tag = 2;
     
-    CGFloat iconX = btn2.frame.origin.x;
-    CGFloat iconWH = btn2.frame.size.width;
-    CGFloat iconY = CGRectGetMaxY(btn2.frame) + 50;
+    btnY = btnY + btnH + 30;
+    btnF = CGRectMake(btnX, btnY, btnW, btnH);
+    UIButton *btn3 = [[UIButton alloc] initWithFrame:btnF];
+    [btn3 setTitle:@"处理其他文件中的图标" forState:UIControlStateNormal];
+    btn3.backgroundColor = [UIColor orangeColor];
+    [btn3 addTarget:self
+             action:@selector(dealIcon:)
+   forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:btn3];
+    btn3.tag = 3;
+    
+    CGFloat iconX = btn3.frame.origin.x;
+    CGFloat iconWH = btn1.frame.size.width;
+    CGFloat iconY = CGRectGetMaxY(btn3.frame) + 30;
     CGRect iconF = CGRectMake(iconX, iconY, iconWH, iconWH);
     UIImageView *iconView = [[UIImageView alloc] initWithFrame:iconF];
     iconView.backgroundColor = [UIColor yellowColor];
@@ -92,6 +105,7 @@
 }
 
 
+
 #pragma mark - 自动生成带水印的图标
 
 /// 处理icon：自动生成带水印的icon
@@ -99,26 +113,49 @@
     [self imgFilePath];
     self.temF = self.iconView.frame;
     
-//    NSString *iconPath = @"/Users/zjh48/Desktop/TestIcon";
     NSString *iconPath = nil;
-    if (iconPath) {
-        // 处理文件夹中的图片
-        
-    } else {
+    BOOL isOnlyWater = YES;
+
+    if (btn.tag == 2) {
+        isOnlyWater = NO;
         // 处理Assets.xcassets中的图片
         iconPath = [[NSBundle mainBundle] bundlePath];
+    } else if (btn.tag == 3) {
+#warning 这里需要改成自己需要打水印的图片地址
+        iconPath = @"/Users/zjh48/Desktop/20201229App-icon/ios";
     }
-    
+
     NSFileManager *fileMgr = [NSFileManager defaultManager];
     NSArray *temArr = [fileMgr contentsOfDirectoryAtPath:iconPath error:nil];
     NSMutableArray *mutArr = [NSMutableArray array];
     for (NSString *str in temArr) {
+        
+        if (isOnlyWater) { // 只打水印的图片
+            NSString *imgPath = [NSString stringWithFormat:@"%@/%@", iconPath, str];
+            UIImage *img = [UIImage imageWithContentsOfFile:imgPath];
+            if (!img) {
+                continue;
+            }
+            CGFloat imgWH = [self getImgSizeWithIconName:str img:img];
+            for (NSString *labStr in self.nameArr) {
+                NSString *imgName = [str lastPathComponent];
+                NSString *imgFilePath =
+                [NSString stringWithFormat:@"%@_%@", self.imgFilePath, labStr];
+                [self dealIconWithImg:img
+                             iconName:imgName
+                                imgWH:imgWH
+                              labText:labStr
+                          imgFilePath:imgFilePath];
+            }
+            continue;
+        }
+        
         if ([str hasPrefix:@"AppIcon"] && [str hasSuffix:@".png"] &&
             ![str containsString:@"~ipad"]) {
             [mutArr addObject:str];
             NSString *imgPath = [NSString stringWithFormat:@"%@/%@", iconPath, str];
             UIImage *img = [UIImage imageWithContentsOfFile:imgPath];
-            CGFloat imgWH = [self getImgSizeWithIconName:str];;
+            CGFloat imgWH = [self getImgSizeWithIconName:str img:img];
             for (NSString *labStr in self.nameArr) {
                 NSString *oriName = [str lastPathComponent];
                 NSString *imgName =
@@ -127,7 +164,8 @@
                 [self dealIconWithImg:img
                              iconName:imgName
                                 imgWH:imgWH
-                              labText:labStr];
+                              labText:labStr
+                          imgFilePath:nil];
             }
             
         }
@@ -143,7 +181,8 @@
 - (void)dealIconWithImg:(UIImage *)img
                iconName:(NSString *)iconName
                   imgWH:(CGFloat)imgWH
-                labText:(NSString *)labText {
+                labText:(NSString *)labText
+            imgFilePath:(NSString *)imgFilePath{
     // 还原视图
     [self.iconView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
     [self.iconView.layer.sublayers makeObjectsPerformSelector:@selector(removeFromSuperlayer)];
@@ -154,7 +193,7 @@
     self.iconView.image = img;
 
     // 图片靠左还是靠右
-    BOOL isLeft = NO;
+    BOOL isLeft = YES;
     
     // 添加背景三角形
     CGFloat triangleH = self.iconView.frame.size.width * 0.4;
@@ -190,30 +229,43 @@
     [self.iconView addSubview:lab];
     
     // view截图
-    UIGraphicsBeginImageContextWithOptions(self.iconView.frame.size, NO, [UIScreen mainScreen].scale);
+    UIGraphicsBeginImageContextWithOptions(self.iconView.frame.size, NO, 1);
     [self.iconView.layer renderInContext:UIGraphicsGetCurrentContext()];
     UIImage *newImg = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     self.iconView.image = newImg;
     
+    NSString *filePath = imgFilePath;
+    if (!filePath) {
+        filePath = self.imgFilePath;
+    }
+    NSFileManager *fileMgr = [NSFileManager defaultManager];
+    if (![fileMgr fileExistsAtPath:filePath]) {
+        [fileMgr createDirectoryAtPath:filePath
+           withIntermediateDirectories:YES
+                            attributes:nil
+                                 error:nil];
+    }
+    
     /// 图片存储在沙河目录
     NSData *imgData = UIImagePNGRepresentation(newImg);
-    NSString *imgPath = [NSString stringWithFormat:@"%@/%@", self.imgFilePath, iconName];
+    NSString *imgPath = [NSString stringWithFormat:@"%@/%@", filePath, iconName];
     [imgData writeToFile:imgPath atomically:YES];
 }
 
 /// 根据图片名获取图片尺寸
-- (CGFloat)getImgSizeWithIconName:(NSString *)iconName {
+- (CGFloat)getImgSizeWithIconName:(NSString *)iconName img:(UIImage *)img {
+    CGFloat imgW = img.size.width;
+    if (![iconName containsString:@"@"]) {
+        return imgW;
+    }
+        
     NSArray *arr1 = [iconName componentsSeparatedByString:@"@"];
-    NSString *str1 = arr1.firstObject;
+    NSString *str1 = arr1.lastObject;
     NSArray *arr2 = [str1 componentsSeparatedByString:@"x"];
-    NSString *str2 = arr2.lastObject;
-    NSInteger imgW1 = [str2 integerValue];
-    NSString *str3 = arr1.lastObject;
-    NSArray *arr3 = [str3 componentsSeparatedByString:@"x"];
-    NSString *str4 = arr3.firstObject;
-    NSInteger imgW2 = [str4 integerValue];
-    return imgW1 * imgW2;
+    NSString *str2 = arr2.firstObject;
+    NSInteger num = [str2 integerValue];
+    return num * imgW;
 }
 
 // 添加三角形
